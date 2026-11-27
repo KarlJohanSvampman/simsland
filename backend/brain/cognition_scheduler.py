@@ -231,7 +231,7 @@ def wake_character(c, world, reason, payload=None, delay=0):
 _WAKE_LINE_TEMPLATES = {
     "person_entered_view": "{subject_name} has just come into view.",
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
-    "not_heard": "{listener_name} didn't hear you -- they're {where}. Go over to them first, or call out louder.",
+    "not_heard": "{listener_name} didn't hear you -- they're {where}. Go over to them to talk, or yell (start what you say with YELL:).",
     "self_assessment": "You just caught yourself repeating the same thing over and over, so you stopped. {thought}",
     "worry_overload": "You tried to {activity} but couldn't concentrate -- your worries keep pulling your mind away. Do something about it first.",
     "floor_unnoticed": "{holder_name} hasn't reacted to what you said -- they're {doing}. Say it again louder, call their attention, or let it go.",

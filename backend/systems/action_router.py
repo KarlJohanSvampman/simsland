@@ -151,6 +151,11 @@ def apply_speech(c, world, speech):
         return
 
     volume = speech.get("volume")
+    _yell = re.match(r"^\s*\**\s*(YELL|SHOUT)\s*:\s*", utterance or "", re.I)
+    if _yell:                                        # "SAY: YELL: Dinner's ready!" -- calling out on purpose
+        utterance = utterance[_yell.end():].strip() or utterance
+        speech["utterance"] = utterance
+        volume = "high"
     if not volume and target_id:
         from systems.conversation_floor import repeat_volume
         volume = repeat_volume(world, c["id"], target_id)
