@@ -46,7 +46,9 @@ def archive(world, conv):
     """A conversation has ended: keep it, give each participant their copy, and queue it for tagging."""
     chars = world.get("characters") or {}
     lines = [{"tick": h.get("tick"), "speaker": h.get("speaker"), "utterance": h.get("utterance"),
-              "speech_act": h.get("speech_act")} for h in conv.get("history") or [] if h.get("utterance")]
+              "speech_act": h.get("speech_act"),
+              **({"conv_act": h["conv_act"]} if h.get("conv_act") else {})}      # systems/conversation_acts.py
+             for h in conv.get("history") or [] if h.get("utterance")]
     participants = [p for p in conv.get("participants") or [] if p in chars]
     if not lines or len(participants) < 2:
         return None
