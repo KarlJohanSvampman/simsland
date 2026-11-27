@@ -76,7 +76,7 @@ def earshot(world, speaker, listener, volume):
     """Face to face: (heard, reach). Too far away or through walls (the test perception uses) -> not heard."""
     from systems.conversation_reach import check_pair
     reach = check_pair(world, speaker, listener, volume)
-    return not any(i.startswith("too far") for i in reach["issues"]), reach
+    return bool(reach.get("heard")), reach      # same room within talking range -- else only a yell (conversation_reach)
 
 
 def channel_open(world, listener, medium):

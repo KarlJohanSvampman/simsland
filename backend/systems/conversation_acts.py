@@ -457,9 +457,22 @@ def partners(c, world):
         out.append((chars[sid], "spoken_to")); seen.add(sid)
     for p in sorted(((c.get("perception") or {}).get("visible_people") or []), key=lambda p: p.get("distance", 99)):
         pid = p.get("id")
-        if pid and pid in chars and pid not in seen and pid != c.get("id") and (p.get("distance") or 0) <= 8:
-            out.append((chars[pid], "nearby")); seen.add(pid)
+        if pid and pid in chars and pid not in seen and pid != c.get("id") and _talking_range(world, c, chars[pid]):
+            out.append((chars[pid], "nearby")); seen.add(pid)   # only someone you could talk to (conversation_reach)
     return out
+
+
+def _reach(world, c, other):
+    try:
+        from systems.conversation_reach import check_pair
+        return check_pair(world, c, other, "medium")
+    except Exception:                                     # noqa: BLE001
+        return None
+
+
+def _talking_range(world, c, other):
+    r = _reach(world, c, other)
+    return bool(r and r.get("talking_range"))
 
 
 def choose(c, world, limit=2):
@@ -480,6 +493,11 @@ def choose(c, world, limit=2):
         if why == "nearby" and p["score"] < MIN_UNPROMPTED:
             continue                                      # nothing worth bringing up with them right now
         p.update(context=why, said=said, ts=now, name=other.get("name") or "them")
+        if why != "nearby":
+            r = _reach(world, c, other)
+            if r and not r.get("talking_range"):
+                p["out_of_range"] = r.get("why_not") or ("in another room" if r["rooms"][0] != r["rooms"][1]
+                                                         else f"{r['distance']:.0f} tiles away")
         picks.append(p)
     acts = c.setdefault("_conv_acts", {})
     for k in [k for k, v in acts.items() if now - (v.get("ts") or 0) > ACT_TTL_S]:
@@ -505,6 +523,9 @@ def prompt_lines(c, world):
             lines.append(f"Talking with {who}, you're going for: {p['label']}{about}. {p['how']}")
         else:
             lines.append(f"If you talk to {who} now, it would be: {p['label']}{about} ({p['why']}). {p['how']}")
+        if p.get("out_of_range"):
+            lines.append(f"{who} is {p['out_of_range']} -- not close enough to talk normally: go over to {who}, or "
+                         f"yell (start what you say with YELL:).")
         if p.get("recent"):
             lines.append(f"What you've talked about with {who} before: {'; '.join(p['recent'])}.")
     if lines:
