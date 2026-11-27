@@ -46,7 +46,9 @@ def archive(world, conv):
     """A conversation has ended: keep it, give each participant their copy, and queue it for tagging."""
     chars = world.get("characters") or {}
     lines = [{"tick": h.get("tick"), "speaker": h.get("speaker"), "utterance": h.get("utterance"),
-              "speech_act": h.get("speech_act")} for h in conv.get("history") or [] if h.get("utterance")]
+              "speech_act": h.get("speech_act"),
+              **({"conv_act": h["conv_act"]} if h.get("conv_act") else {})}      # systems/conversation_acts.py
+             for h in conv.get("history") or [] if h.get("utterance")]
     participants = [p for p in conv.get("participants") or [] if p in chars]
     if not lines or len(participants) < 2:
         return None
@@ -189,6 +191,11 @@ def apply_tags(world, entry, tags):
     entry["tags"] = tags
     from social.discourse import after
     after(world, entry, tags)
+    try:                                       # what it was about, into each pair's topic memory (systems/catch_up.py)
+        from systems.catch_up import on_conversation_read
+        on_conversation_read(world, entry)
+    except Exception as exc:                   # noqa: BLE001
+        print(f"[conversation_archive] topics: {exc!r}")
     _rewrite_memories(world, entry, tags)
     _refresh_logs(world, entry)
 

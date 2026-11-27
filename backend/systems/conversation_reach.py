@@ -18,6 +18,13 @@ import math
 
 INCIDENTS_KEPT = 100
 
+# Talking, not calling out (the user, 2026-11-27: "preventing conversation unless in same room, or based on distance --
+# larger distance than x and one should have to yell"): an ordinary voice reaches someone in the same room (outdoors is
+# one space) within TALK_RANGE_TILES. Further away, or in another room, only a yell reaches them -- and only as far as
+# a yell carries (perception's own test: VOLUME_TIERS, muffled by walls).
+TALK_RANGE_TILES = 4.0
+YELL_VOLUMES = ("high", "loud", "intense")
+
 
 def check_pair(world, speaker, listener, volume=None):
     """{"ok", "issues": [...], "distance", "hit", "by", "rooms": [a, b], "carries"} for speaker -> listener now."""
@@ -39,10 +46,31 @@ def check_pair(world, speaker, listener, volume=None):
         issues.append(f"no line of sight ({trace['by']})")
     if effective > carries:
         issues.append(f"too far ({d:.1f} tiles; a {volume} voice carries {carries:.0f})")
+    yelled = volume in YELL_VOLUMES
+    talking_range = ra == rb and d <= TALK_RANGE_TILES
+    if effective > carries and (yelled or not _yell_would_carry(speaker, listener, d)):
+        heard, needs = False, ("further than a yell carries" if yelled else "too far away")
+    elif effective <= carries and (talking_range or yelled):
+        heard, needs = True, None
+    else:                                          # carries, but this isn't talking distance: it takes a yell
+        heard = False
+        needs = "in another room" if ra != rb else f"{d:.0f} tiles away -- too far to talk normally"
+        issues.append("too far to talk normally (" + ("another room" if ra != rb else f"{d:.1f} tiles") + ")")
     hit = trace.get("hit")
     return {"ok": not issues, "issues": issues, "distance": round(d, 2), "volume": volume,
             "hit": [round(hit[0], 2), round(hit[1], 2)] if hit else None, "by": trace.get("by"),
-            "rooms": [ra, rb], "carries": round(carries, 1)}
+            "rooms": [ra, rb], "carries": round(carries, 1), "heard": heard, "why_not": needs,
+            "talking_range": talking_range}
+
+
+def _yell_would_carry(speaker, listener, d):
+    """Would a yell reach them from here (so the speaker should be told to yell, not that it's hopeless)?"""
+    from brain.perception import volume_range, sound_modifier
+    try:
+        manhattan = abs(speaker["x"] - listener["x"]) + abs(speaker["y"] - listener["y"])
+        return manhattan / max(1e-6, sound_modifier(listener, speaker, "high")) <= volume_range(listener, "high")
+    except Exception:                                     # noqa: BLE001
+        return d <= volume_range(listener, "high")
 
 
 def note_unheard(world, speaker, listener, utterance, reach, tell_speaker=True):
@@ -57,7 +85,7 @@ def note_unheard(world, speaker, listener, utterance, reach, tell_speaker=True):
     log.append(entry)
     del log[:-INCIDENTS_KEPT]
     speaker["_unheard"] = {"target": listener["id"], "tick": entry["tick"], "volume": reach.get("volume")}   # call out next time
-    where = "in another room" if reach["rooms"][0] != reach["rooms"][1] else "too far away"
+    where = reach.get("why_not") or ("in another room" if reach["rooms"][0] != reach["rooms"][1] else "too far away")
     print(f"[talk-reach] tick {entry['tick']}: {speaker.get('name')} -> {listener.get('name')}: not heard "
           f"({', '.join(reach['issues'])})", flush=True)
     if not tell_speaker:

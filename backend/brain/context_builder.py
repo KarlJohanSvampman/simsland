@@ -1823,6 +1823,13 @@ def _sec_clothes(c, world):
     return prompt_line(world, c)
 
 
+def _sec_conversation_act(c, world):
+    # what they're going for with the person they're talking to / who spoke to them / someone close by: one act, from
+    # the situation (systems/conversation_acts.py)
+    from systems.conversation_acts import prompt_lines
+    return "\n".join(prompt_lines(c, world)) or None
+
+
 def _sec_walkout(c, world):
     # walked off mid-conversation / was walked out on / about to (systems/walkout.py)
     from systems.walkout import prompt_line
@@ -2518,6 +2525,7 @@ def _sec_phone(c, world):
 # skipped in brief mode — see TIER_SETS / BRIEF_REASONS.
 NARRATIVE_SECTIONS = [
     ("scene",                "core", _sec_scene),
+    ("conversation_act",      "core", _sec_conversation_act),
     ("hearing",               "full", _sec_hearing),
     ("news",                  "full", _sec_news),
     ("incidents",             "full", _sec_incidents),
