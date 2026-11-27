@@ -94,7 +94,14 @@ TAGS: <the ONE trait from your personality above that most decided this choice -
 """
 
 
-def build_system_prompt(available_actions, cpl=None):
+def build_system_prompt(available_actions, cpl=None, unsaved=None):
+    """The system message, from the "system" template (brain/prompt_templates.py -- editable on the Prompt Templates
+    page). A template that fails to render falls back to the built-in prompt: a bad edit never stops decisions."""
+    try:
+        from brain import prompt_templates as PT
+        return PT.render("system", PT.system_values(available_actions, cpl), unsaved)
+    except Exception as exc:                              # noqa: BLE001
+        print(f"[llm_brain] system template failed, using the built-in prompt: {exc!r}")
     menu = _format_action_menu(available_actions or {})
     extra = ""
     if cpl:                       # in a CPL conversation (cpl/turns.py): the lines that answer what is open
@@ -429,7 +436,18 @@ def describe_id_only(available_actions):
     return "\n".join(lines)
 
 
-def build_prompt(context):
+def build_prompt(context, unsaved=None):
+    """The user message, from the "user" template (brain/prompt_templates.py); the built-in assembly below if it
+    fails."""
+    try:
+        from brain import prompt_templates as PT
+        return PT.render("user", PT.user_values(context), unsaved)
+    except Exception as exc:                              # noqa: BLE001
+        print(f"[llm_brain] user template failed, using the built-in prompt: {exc!r}")
+    return _builtin_prompt(context)
+
+
+def _builtin_prompt(context):
 
     # context = {"narrative": "<prose>", "available_actions": {...},
     # "environment_scan": {...} | None} (brain/context_builder.py::
