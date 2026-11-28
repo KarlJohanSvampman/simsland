@@ -472,7 +472,7 @@ def _refresh_intention(c, nd, world):
 
     defs = world.get("definitions", {})
     template = defs.get("expectation_templates", {}).get(nd["template_id"], {})
-    label = template.get("label", nd["template_id"])
+    label = nd.get("label") or template.get("label", nd["template_id"])     # an agreement's own words (systems/agreements.py)
     base_priority = template.get("base_priority", 40)
 
     if nd["status"] == "missed":

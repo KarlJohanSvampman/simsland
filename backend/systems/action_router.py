@@ -117,6 +117,13 @@ def apply_speech(c, world, speech):
             topic = speech.get("topic") or topic
     except Exception as exc:                          # noqa: BLE001
         print(f"[action_router] conversation act: {exc!r}")
+    try:                                              # a kid calls their mother Mom, not "Rebecca" (systems/family_address.py)
+        from systems.family_address import fix_vocative
+        fixed = fix_vocative(world, c, target_id, utterance)
+        if fixed != utterance:
+            utterance = speech["utterance"] = fixed
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[action_router] family address: {exc!r}")
 
     # Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an answer.
     # Someone holding the floor of a live conversation with this person is being waited on: "Okay!" or "Yeah!" said twice
@@ -355,6 +362,14 @@ def apply_speech(c, world, speech):
         _last = (conv.get("history") or [{}])[-1]
         if speech.get("conv_act") and _last.get("speaker") == c["id"]:
             _last["conv_act"] = speech["conv_act"]          # what the other answers to (systems/conversation_acts.py)
+            _last["conv_topic"] = speech.get("topic")
+        if _last.get("speaker") == c["id"]:
+            try:                                             # an echo? agreed to an offer? (systems/conversation_loops.py)
+                from systems.conversation_loops import on_line as _loops_line
+                _loops_line(world, conv, c["id"], utterance, speech.get("conv_act"),
+                            speech.get("topic") if speech.get("conv_act") else None)
+            except Exception as exc:                      # noqa: BLE001
+                print(f"[action_router] conversation loops: {exc!r}")
         try:                                                 # they've talked now; the act's topic is remembered
             from systems.catch_up import on_line as _catch_up_line
             _catch_up_line(world, c, listener, topic=speech.get("topic") if speech.get("conv_act") else None,

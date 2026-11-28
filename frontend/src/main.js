@@ -5182,6 +5182,20 @@ function renderCharacterInspector(id){
     const why = _emotionCauses(c);
     if(why.length) rows.push(`<span style="opacity:.8">&nbsp;&nbsp;Worked up about: ${why.map(w => _escapeHTML(w)).join("; ")}</span>`);
   }
+  // Agreements: what they agreed to, what others agreed to do for them, rules agreed on (backend/systems/agreements.py)
+  if((c.agreements || []).length){
+    const nameOf = id => ((_worldState?.characters || {})[id]?.name || id || "").split(" ")[0];
+    const mark = {pending: "○", kept: "✓", done: "✓", missed: "✗"};
+    const color = {pending: "#ccc", kept: "#8d8", done: "#8d8", missed: "#f88"};
+    const lines = c.agreements.slice(0, 8).map(a => {
+      const who = a.kind === "rule" ? `with ${(a.with || []).map(nameOf).join(", ")}`
+                : a.mine ? `you, with ${(a.with || []).map(nameOf).join(", ")}` : `${nameOf(a.responsible)}`;
+      const when = a.cadence === "daily" ? " · daily" : a.cadence === "weekly" ? " · weekly" : "";
+      const st = a.kind === "rule" ? "rule" : (a.status || "pending");
+      return `<span style="color:${color[st] || "#9cf"}">${mark[st] || "•"} ${_escapeHTML(a.obligation)}</span> <span style="opacity:.6">(${_escapeHTML(who)}${when}${a.kept ? ` · kept ${a.kept}×` : ""}${a.missed ? ` · missed ${a.missed}×` : ""})</span>`;
+    });
+    rows.push(`Agreements:<br>&nbsp;&nbsp;${lines.join("<br>&nbsp;&nbsp;")}`);
+  }
   if(c.vision){
     const glasses = c.glasses?.owned ? " (with glasses)" : (c.vision === "impaired" ? " (no glasses)" : "");
     rows.push(`<span style="opacity:.8">Vision: ${c.vision}${glasses}</span>`);

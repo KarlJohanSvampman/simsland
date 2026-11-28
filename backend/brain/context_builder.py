@@ -1830,6 +1830,18 @@ def _sec_conversation_act(c, world):
     return "\n".join(prompt_lines(c, world)) or None
 
 
+def _sec_family_address(c, world):
+    """What a child or teen calls their parents (systems/family_address.py)."""
+    from systems.family_address import prompt_lines
+    return " ".join(prompt_lines(c, world)) or None
+
+
+def _sec_agreements(c, world):
+    # what they agreed to do, what others agreed to do for them, and rules agreed on (systems/agreements.py)
+    from systems.agreements import prompt_lines
+    return "\n".join(prompt_lines(c, world)) or None
+
+
 def _sec_walkout(c, world):
     # walked off mid-conversation / was walked out on / about to (systems/walkout.py)
     from systems.walkout import prompt_line
@@ -2540,6 +2552,8 @@ NARRATIVE_SECTIONS = [
     ("social_script",         "core", _sec_social_script),
     ("clothes",               "core", _sec_clothes),
     ("walkout",               "core", _sec_walkout),
+    ("agreements",            "core", _sec_agreements),
+    ("family_address",        "core", _sec_family_address),
     ("child_cognition",       "core", _sec_child_cognition),
     ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),
