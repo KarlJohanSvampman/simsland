@@ -500,8 +500,42 @@ async def prompt_send_ep(req: LLMSendReq):
 
 # ─── Ollama status (the view page's status light) ─────────────────────────────
 
-_ollama_status_cache: Dict[str, Any] = {"at": 0.0, "value": None}
-_OLLAMA_STATUS_TTL = 5.0       # seconds; every open page polls, Ollama is asked at most once per this
+_ollama_status_cache: Dict[str, Any] = {"at": 0.0, "value": None, "refreshing": False}
+_OLLAMA_STATUS_TTL = 15.0      # seconds; every open page polls (every 10 s), the model services are asked at most this often
+_ollama_status_lock = __import__("threading").Lock()
+
+
+def _check_ollama_status():
+    """Ask every model service now (llm/provider.py) -- all profiles at once -- and keep the answer."""
+    from llm import provider
+    names = provider.profile_names()
+    if len(names) > 1:
+        # several model profiles: the light shows the default one, coloured by the worst of them, and lists them all
+        allst = provider.status_all()
+        default = provider.default_name()
+        out = dict(next((p for p in allst["profiles"] if p.get("profile") == default), allst["profiles"][0]))
+        for k in ("characters", "max_concurrency"):
+            out.pop(k, None)
+        out["profiles"] = allst["profiles"]
+        rank = {"up": 0, "degraded": 1, "down": 2}
+        worst = max(allst["profiles"], key=lambda s: rank.get(s.get("state"), 2))
+        if rank.get(worst.get("state"), 2) > rank.get(out.get("state"), 2):
+            out["state"] = worst["state"]
+            out["error"] = f"profile {worst['profile']!r}: {worst.get('error') or worst.get('state')}"
+        out["provider_label"] = " + ".join(dict.fromkeys(s["provider_label"] for s in allst["profiles"]))
+    else:
+        out = provider.status()
+    _ollama_status_cache.update(at=time.monotonic(), value=out)
+    return out
+
+
+def _refresh_ollama_status():
+    try:
+        _check_ollama_status()
+    except Exception as exc:                              # noqa: BLE001
+        print(f"[debug] ollama status: {exc!r}")
+    finally:
+        _ollama_status_cache["refreshing"] = False
 
 
 @router.get("/ollama_status")
@@ -512,30 +546,22 @@ def ollama_status_ep():
     top-right corner of the view page (frontend/src/ollamaStatus.js).
 
     Asks Ollama for its installed models (GET /api/tags -- cheap, loads no model) and the models it holds in
-    memory (GET /api/ps), with a short timeout, and caches the answer for _OLLAMA_STATUS_TTL so any number of
-    open pages costs Ollama one request per interval. Core-only because OLLAMA_BASE_URL / OLLAMA_MODEL are
-    set on the core (docker-compose.yml), not on the gateway.
+    memory (GET /api/ps), with a short timeout -- every profile at once. The last answer is returned straight away
+    and, once it is older than _OLLAMA_STATUS_TTL, a fresh check starts in the background (only the very first call
+    waits for one): live 2026-11-28 the check took 3-8 s through the gateway while Ollama itself answered in 0.1 s,
+    and the light, giving up at 8 s, showed red for a server that was up. Core-only because OLLAMA_BASE_URL /
+    OLLAMA_MODEL are set on the core (docker-compose.yml), not on the gateway.
 
     state: "up"       -- answered, and the configured model is installed
            "degraded" -- answered, but the configured model is not among its models
            "down"     -- did not answer (refused, timed out, or an HTTP error)"""
-    from llm import provider
-
-    now = time.monotonic()
     cached = _ollama_status_cache["value"]
-    if cached is not None and now - _ollama_status_cache["at"] < _OLLAMA_STATUS_TTL:
-        return cached
-    out = provider.status()
-    names = provider.profile_names()
-    if len(names) > 1:
-        # several model profiles: the light shows the default one, coloured by the worst of them, and lists them all
-        allst = provider.status_all()
-        out["profiles"] = allst["profiles"]
-        rank = {"up": 0, "degraded": 1, "down": 2}
-        worst = max(allst["profiles"], key=lambda s: rank.get(s.get("state"), 2))
-        if rank.get(worst.get("state"), 2) > rank.get(out.get("state"), 2):
-            out["state"] = worst["state"]
-            out["error"] = f"profile {worst['profile']!r}: {worst.get('error') or worst.get('state')}"
-        out["provider_label"] = " + ".join(dict.fromkeys(s["provider_label"] for s in allst["profiles"]))
-    _ollama_status_cache.update(at=now, value=out)
-    return out
+    if cached is None:
+        return _check_ollama_status()
+    if time.monotonic() - _ollama_status_cache["at"] >= _OLLAMA_STATUS_TTL:
+        with _ollama_status_lock:
+            if not _ollama_status_cache["refreshing"]:
+                _ollama_status_cache["refreshing"] = True
+                __import__("threading").Thread(target=_refresh_ollama_status, daemon=True,
+                                               name="ollama-status").start()
+    return dict(cached, age_s=round(time.monotonic() - _ollama_status_cache["at"], 1))
