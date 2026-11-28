@@ -58,6 +58,7 @@ from api.llm_debug import router as llm_debug_router
 from api.prompt_templates import router as prompt_templates_router
 from api.memory_trace import router as memory_trace_router
 from api.conversation_trace import router as conversation_trace_router
+from api.social import router as social_router
 from api.dialogue_feedback import router as dialogue_feedback_router
 from api.personal_rules import router as personal_rules_router
 from api.directors_cut import router as directors_cut_router
@@ -106,6 +107,7 @@ app.include_router(llm_debug_router)
 app.include_router(prompt_templates_router)
 app.include_router(memory_trace_router)
 app.include_router(conversation_trace_router)
+app.include_router(social_router)
 app.include_router(dialogue_feedback_router)
 app.include_router(personal_rules_router)
 app.include_router(directors_cut_router)

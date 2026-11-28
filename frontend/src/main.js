@@ -2,6 +2,7 @@ import { showPersona } from "./personaTab.js";
 import * as THREE from "three";
 import { renderMovementTab, updateRouteOverlay } from "./movementLog.js";
 import { renderArgumentsTab, openArgumentModal, renderStandingTab, openStandingModal } from "./socialTabs.js";
+import { showSocial } from "./agreementsTab.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
@@ -5333,6 +5334,9 @@ function renderCharacterInspector(id){
   // update, so what is being typed stays
   const personaEl = document.getElementById("viewerPersonaTab");
   if(personaEl && !personaEl.classList.contains("hidden")) showPersona(personaEl, c.id);
+  // Social (src/agreementsTab.js): fetched when shown, on another character, and at most every 10 s while open
+  const socialEl = document.getElementById("viewerSocialTab");
+  if(socialEl && !socialEl.classList.contains("hidden")) showSocial(socialEl, c.id, _socialCtx());
 }
 
 // What the Arguments / Standing tabs (socialTabs.js) need from here.
@@ -6883,7 +6887,7 @@ function _renderExpectationsWeek(expectations, dayTicks){
         const left = Math.max(0, ((clippedStart - range.startTick) / 86400) * 100);
         const width = Math.max(2, Math.min(100 - left, ((clippedEnd - clippedStart) / 86400) * 100));
         const tmpl = definitions.expectation_templates?.[e.template_id];
-        const label = tmpl?.label || e.template_id;
+        const label = _escapeHTML(e.label || tmpl?.label || e.template_id);
         return `<div class="expectCalLane">
           <div class="expectCalBlock" title="${label} (${e.status})"
                style="left:${left}%; width:${width}%; background:${_expectationColorFor(e.status)};"></div>
@@ -6900,7 +6904,7 @@ function _renderExpectationsWeek(expectations, dayTicks){
   const unwindowedLines = unwindowed.map(e => {
     const tmpl = definitions.expectation_templates?.[e.template_id];
     const status = _expectationStatusHtml(e);
-    return `<div class="viewerCard">${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence})</span> — ${status}</div>`;
+    return `<div class="viewerCard">${_escapeHTML(e.label || tmpl?.label || e.template_id)} <span style="opacity:.5">(${e.cadence})</span> — ${status}</div>`;
   }).join("");
 
   return _section("Expectations — this week (click a day for details)", `
@@ -6930,7 +6934,7 @@ function _renderExpectationsDayDetail(day, expectations, range){
     <div class="scheduleDetailRow">
       <div class="scheduleDetailSwatch" style="background:${_expectationColorFor(e.status)};"></div>
       <div class="scheduleDetailTime">${timeLabel}</div>
-      <div>${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence}, ${e.status}${detail})</span></div>
+      <div>${_escapeHTML(e.label || tmpl?.label || e.template_id)} <span style="opacity:.5">(${e.cadence}, ${e.status}${detail})</span></div>
     </div>`;
   }).join("") : _empty("No expectation windows this day.");
 
@@ -7225,7 +7229,7 @@ function renderLifeTab(c){
     const lines = expectations.map(e => {
       const tmpl = expectationTemplates[e.template_id];
       const status = _expectationStatusHtml(e);
-      return `<div class="viewerCard">${tmpl?.label || e.template_id} — ${status}</div>`;
+      return `<div class="viewerCard">${_escapeHTML(e.label || tmpl?.label || e.template_id)} — ${status}</div>`;
     });
     sections.push(_section("Expectations", lines.join("")));
   }
@@ -7756,6 +7760,7 @@ const VIEWER_TAB_PANELS = {
   movement:      "viewerMovementTab",
   arguments:     "viewerArgumentsTab",
   standing:      "viewerStandingTab",
+  social:        "viewerSocialTab",
   persona:       "viewerPersonaTab",
 };
 
@@ -7768,6 +7773,7 @@ document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
     document.getElementById(panelId)?.classList.toggle("hidden", name !== tab);
   }
   if(tab === "persona") showPersona(document.getElementById("viewerPersonaTab"), selectedCharacterId);
+  if(tab === "social") showSocial(document.getElementById("viewerSocialTab"), selectedCharacterId, _socialCtx(), true);
 });
 
 // =========================================================

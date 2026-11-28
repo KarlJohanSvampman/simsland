@@ -289,6 +289,42 @@ def _fallback_window(cadence, calendar, world):
     return None, None
 
 
+def time_window_ticks(tw, calendar, world, days=range(0, 8), after_tick=None):
+    """The next real (start, end) of an expectation's own clock time -- tw = {"start": "HH:MM", "end": "HH:MM",
+    "weekdays": [0-6] or None}, from an agreement with a time in it (systems/agreements.py::parse_time: "clean up after
+    dinner", "take out the trash on Sundays", "be home by 9pm"). `days` counts from today; with after_tick, the first
+    one that hasn't ended by then. (None, None) when none of those days has it."""
+    if not tw or not calendar:
+        return None, None
+    today = date(calendar["year"], calendar["month"], calendar["day"])
+    sh, sm = (int(x) for x in str(tw.get("start") or "00:00").split(":"))
+    eh, em = (int(x) for x in str(tw.get("end") or "24:00").split(":"))
+    weekdays = tw.get("weekdays")
+    for d in days:
+        day = today + timedelta(days=d)
+        if weekdays and day.weekday() not in weekdays:
+            continue
+        start = _calendar_moment_to_tick(world, calendar, day, sh, sm)
+        end = _calendar_moment_to_tick(world, calendar, day, 0, 0) + (eh * 60 + em) * 60
+        if end <= start:
+            end += 86400
+        if after_tick is not None and end <= after_tick:
+            continue
+        return start, end
+    return None, None
+
+
+def _own_time_window(c, world, template_id, calendar, cadence):
+    """An agreement's own time (time_window on the entry): today for a daily one, that day of this week for a weekly
+    one. (None, None) when it isn't due today / this week."""
+    nd = (c.get("expectations") or {}).get(template_id) or {}
+    tw = nd.get("time_window")
+    if cadence == "weekly":
+        wd = _WEEKDAY_INDEX.get((calendar.get("weekday") or "").lower(), 0)
+        return time_window_ticks(tw, calendar, world, days=range(-wd, 7 - wd))
+    return time_window_ticks(tw, calendar, world, days=range(0, 1))
+
+
 def _compute_window(c, world, template_id, calendar, cadence=None):
     """A real (window_start_tick, window_end_tick) for the CURRENT
     period -- a matching real schedule block today (make_dinner/
@@ -296,6 +332,8 @@ def _compute_window(c, world, template_id, calendar, cadence=None):
     falls back to a real calendar-derived window for the expectation's
     own cadence (see _fallback_window) so every expectation gets a real
     timespan, not just the schedule-linked handful."""
+    if ((c.get("expectations") or {}).get(template_id) or {}).get("time_window"):
+        return _own_time_window(c, world, template_id, calendar, cadence)
     activity = _SCHEDULE_LINKED_EXPECTATIONS.get(template_id)
     if activity:
         weekday = (calendar.get("weekday") or "").lower()
@@ -381,6 +419,10 @@ def update_expectations(c, world):
                     _apply_miss_feedback(c, nd, world)
                 nd["window_start_tick"] = tick
                 nd["window_end_tick"] = tick + 7 * 86400
+                if nd.get("time_window"):                 # agreed for a time: the next time it comes round
+                    ws, we = time_window_ticks(nd["time_window"], calendar, world, after_tick=tick)
+                    if ws is not None:
+                        nd["window_start_tick"], nd["window_end_tick"] = ws, we
                 nd["satisfied_this_period"] = False
                 nd["status"] = "pending"
             continue
@@ -409,6 +451,13 @@ def update_expectations(c, world):
             # days still to go read as failed the moment its window opened.
             nd["status"] = "pending"
             nd["not_applicable"] = False
+            # Agreed for a time (systems/agreements.py): not due today / this week, or -- agreed just now -- its time
+            # has already gone by: nothing to miss this period.
+            if nd.get("time_window") and (nd["window_end_tick"] is None
+                                          or (was_first_period and nd["window_end_tick"] <= tick)):
+                nd["satisfied_this_period"] = True
+                nd["status"] = "satisfied"
+                nd["not_applicable"] = True
 
             # Confirmed live bug (player report: "go_to_work" flagged
             # missed in the middle of the night with no work scheduled
