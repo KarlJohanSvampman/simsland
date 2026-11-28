@@ -390,11 +390,55 @@ def score(c, other, world, replying_to=None, s=None):
         v -= 1.5 if furious else 0
         put("negotiate", v, s["turned_down"] or s["issue"] or "what each of you gets", "you want a deal")
 
+    # Settled in this conversation: dropped. Talked through with them in the last few hours (and not this conversation's
+    # own topic): much less likely -- live 2026-11-28, every conversation went back to "the mess", agreed, then agreed
+    # again (systems/conversation_loops.py).
+    conv = _conversation_with(c, other, world)
+    for act in [a for a in out if a in _TOPIC_ACTS]:
+        sc, topic, why = out[act]
+        if conv is not None and _loops().settled(conv, topic):
+            out.pop(act)
+        elif _rehashed(c, other, topic, conv, world):
+            out[act] = (round(sc * 0.4, 2), topic, why)
+    # The same act twice running in this conversation: a third is less likely (live 2026-11-28, "compromise" after
+    # "compromise" after "compromise" about the chores, systems/conversation_loops.py).
+    if conv is not None:
+        mine = [h.get("conv_act") for h in (conv.get("history") or []) if h.get("speaker") == c.get("id")][-2:]
+        if len(mine) == 2 and mine[0] == mine[1] and mine[0] in out:
+            sc, topic, why = out[mine[0]]
+            out[mine[0]] = (round(sc * 0.6, 2), topic, why)
     if replying_to in RESPONSES:                           # a reply follows what they just did
         for act, w in RESPONSES[replying_to].items():
             sc, topic, why = out.get(act, (0.0, None, ""))
             out[act] = (round(sc + 2.0 * w, 2), topic or "what they just said", why or "answering them")
     return out
+
+
+_TOPIC_ACTS = {"criticism", "debate", "discipline", "compromise", "negotiate", "rage"}
+REHASH_S = 3 * 3600
+
+
+def _loops():
+    from systems import conversation_loops
+    return conversation_loops
+
+
+def _conversation_with(c, other, world):
+    for conv in (world.get("conversations") or {}).values():
+        if conv.get("active") and c.get("id") in (conv.get("participants") or []) and other.get("id") in (conv.get("participants") or []):
+            return conv
+    return None
+
+
+def _rehashed(c, other, topic, conv, world):
+    """Talked about with them in the last REHASH_S -- in an earlier conversation, not this one."""
+    if not topic or (conv is not None and _loops().discussed_here(conv, topic)):
+        return False
+    now = _now(world)
+    for e in (c.get("talk_topics") or {}).get(other.get("id")) or []:
+        if now - (e.get("last_ts") or 0) <= REHASH_S and _loops()._match(topic, e.get("topic")):
+            return True
+    return False
 
 
 def pick(c, other, world, replying_to=None, rng=None):
@@ -523,6 +567,9 @@ def prompt_lines(c, world):
             lines.append(f"Talking with {who}, you're going for: {p['label']}{about}. {p['how']}")
         else:
             lines.append(f"If you talk to {who} now, it would be: {p['label']}{about} ({p['why']}). {p['how']}")
+        conv = _conversation_with(c, {"id": p["with"]}, world) if p["context"] == "conversation" else None
+        if conv is not None:
+            lines.extend(_loops().prompt_line(conv))
         if p.get("out_of_range"):
             lines.append(f"{who} is {p['out_of_range']} -- not close enough to talk normally: go over to {who}, or "
                          f"yell (start what you say with YELL:).")

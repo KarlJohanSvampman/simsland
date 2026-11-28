@@ -53,6 +53,7 @@ import social.tick           # noqa: F401 -- social discourse: handlers, the old
 import systems.rifts          # noqa: F401 -- registers the rift timers and the hourly standing scan
 import brain.intention_history  # noqa: F401 -- finished intentions, for the inspector
 import systems.wardrobe  # noqa: F401 -- clothes: dressed awake, pyjamas asleep, laundry (every 10 sim-minutes + activity events)
+import systems.agreements  # noqa: F401 -- agreed terms become tasks / reminders; kept or broken (every 10 sim-minutes)
 import systems.relationship_recovery  # noqa: F401 -- feelings heal with sim time (hourly)
 import systems.walkout  # noqa: F401 -- walked off mid-conversation: say why / follow up (every sim-minute)
 import systems.social_script  # noqa: F401 -- society's script: milestones, shame, hopelessness (hourly + speech_spoken)
