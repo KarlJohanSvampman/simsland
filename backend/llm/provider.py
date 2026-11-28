@@ -370,6 +370,12 @@ def status_all(timeout=3.0):
     who = {}
     for cid, pname in _assign.items():
         who.setdefault(pname, []).append(cid)
+    names = profile_names()
+    # every profile at once, not one after another: a slow one (a cloud API's TLS handshake) used to hold up the rest,
+    # and the whole check ran past the status light's timeout (live 2026-11-28: 3-8 s for answers of 0.1-0.6 s)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max(1, len(names))) as pool:
+        results = list(pool.map(lambda n: status(timeout, n), names))
     return {"default": default_name(), "background": background_name(), "from_file": config() is not None,
-            "profiles": [{**status(timeout, n), "characters": who.get(n, []),
-                          "max_concurrency": settings(n)["max_concurrency"]} for n in profile_names()]}
+            "profiles": [{**st, "characters": who.get(n, []), "max_concurrency": settings(n)["max_concurrency"]}
+                         for n, st in zip(names, results)]}

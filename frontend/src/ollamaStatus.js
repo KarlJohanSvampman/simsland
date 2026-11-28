@@ -4,13 +4,14 @@
 // Polls GET /debug/ollama_status (backend/api/debug.py), which asks the
 // Ollama server the simulation decides with whether it is up and has the
 // configured model installed. Green = up, amber = answering but the model
-// is missing, red = not answering (or the simulation core itself did not
-// answer), grey pulsing = first check still in flight.
+// is missing, red = not answering, grey pulsing = first check still in
+// flight, or the simulation itself didn't answer the check (it may be busy or
+// restarting -- that says nothing about the model service, so it isn't red).
 // Hover for details; click to check again right away.
 // =========================================================
 
 const POLL_MS = 10000;
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 15000;
 
 const el = document.getElementById("ollamaStatus");
 const nameEl = document.getElementById("ollamaStatusName");
@@ -55,8 +56,8 @@ async function check() {
     const s = await r.json();
     render(s.state === "up" || s.state === "degraded" ? s.state : "down", describe(s));
   } catch (err) {
-    const why = err.name === "AbortError" ? "the status check timed out" : err.message;
-    render("down", `${nameEl ? nameEl.textContent : "Model"}: unknown — ${why}\nclick to check now`);
+    const why = err.name === "AbortError" ? "the simulation didn't answer the check in time" : err.message;
+    render("checking", `${nameEl ? nameEl.textContent : "Model"}: unknown — ${why}\nclick to check now`);
   } finally {
     clearTimeout(abort);
     inFlight = false;

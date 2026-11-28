@@ -1319,7 +1319,7 @@
     "kitchen_cabinet": {
       "name": "Kitchen Cabinet",
       "category": "furniture",
-      "model": "/resources/props/closet_02.glb",
+      "model": "/resources/props/closet_002.glb",
       "footprint": [
         {
           "dx": 0,
@@ -5047,7 +5047,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "document",
-      "model": "/resources/items/media/document/document.glb",
       "icon": "document",
       "tags": [
         "document"
@@ -5061,7 +5060,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "drawing",
-      "model": "/resources/items/media/drawing/drawing.glb",
       "icon": "document",
       "tags": [
         "document",
@@ -7838,7 +7836,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "book",
-      "model": "/resources/items/media/book/book.glb",
       "icon": "books_media",
       "tags": [
         "reading",
@@ -7853,7 +7850,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "magazine",
-      "model": "/resources/items/media/magazine/magazine.glb",
       "icon": "books_media",
       "tags": [
         "reading",
@@ -7867,7 +7863,6 @@
       "base_price": 2,
       "stackable": false,
       "consumable": false,
-      "model": "/resources/items/media/newspaper/newspaper.glb",
       "icon": "books_media",
       "tags": [
         "reading",
@@ -7883,7 +7878,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "dvd",
-      "model": "/resources/items/media/dvd/dvd.glb",
       "icon": "books_media",
       "tags": [
         "entertainment"
@@ -7897,7 +7891,6 @@
       "stackable": false,
       "consumable": false,
       "content_category": "music_disc",
-      "model": "/resources/items/media/music_disc/music_disc.glb",
       "icon": "books_media",
       "tags": [
         "entertainment",
